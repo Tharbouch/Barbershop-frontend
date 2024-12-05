@@ -1,19 +1,19 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 
-const PrivateRoute = ({ children, barberOnly = false }) => {
+const PrivateRoute = ({ children, roles }) => {
     const token = localStorage.getItem('token');
-    const role = localStorage.getItem('role');
+    const userRole = localStorage.getItem('role');
 
     if (!token) {
-        return <Navigate to="/login" />;
+        return <Navigate to="/login" replace />;
     }
 
-    if (barberOnly && role !== 'barber') {
-        return <Navigate to="/" />;
+    if (roles && !roles.includes(userRole)) {
+        return <Navigate to="/" replace />;
     }
 
     return children;
-}
+};
 
 export default PrivateRoute;

@@ -1,33 +1,80 @@
-// src/pages/BarberDashboard.js
-import React from 'react';
-import { Container, Typography, List, ListItem, ListItemText } from '@mui/material';
-import axios from 'axios';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { Container, Typography, List, ListItem, ListItemText, Button, CircularProgress } from '@mui/material';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from '../api/axios';
 
+// Fetch appointments
 const fetchAppointments = async () => {
-    const token = localStorage.getItem('token');
-    const res = await axios.get('http://localhost:5000/api/appointments/barber', {
-        headers: { Authorization: `Bearer ${token}` }
-    });
-    return res.data;
+    try {
+        const res = await axios.get('/appointments/barber');
+        return res.data;
+    } catch (error) {
+        console.error("Error fetching appointments:", error);
+        throw error;
+    }
+}
+
+// Update appointment status
+const updateAppointmentStatus = async ({ id, status }) => {
+    try {
+        const res = await axios.put(`/appointments/${id}`, { status });
+        return res.data;
+    } catch (error) {
+        console.error("Error updating status:", error);
+        throw error;
+    }
 }
 
 const BarberDashboard = () => {
-    const { data: appointments, isLoading, error } = useQuery(['barberAppointments'], fetchAppointments);
+    const [status, setStatus] = useState(null);
+    const { data: appointments, isLoading, error } = useQuery({
+        queryKey: ['barberAppointments'],
+        queryFn: fetchAppointments,
+    });
 
-    if (isLoading) return <div>Loading appointments...</div>;
-    if (error) return <div>Error fetching appointments</div>;
+    const queryClient = useQueryClient();
+
+    // Mutation for updating the status
+    const mutation = useMutation({
+        mutationFn: updateAppointmentStatus,
+        onSuccess: () => {
+            queryClient.invalidateQueries(['barberAppointments']);
+        }
+    });
+
+    const handleChangeStatus = (id, currentStatus) => {
+        const newStatus = currentStatus === 'pending' ? 'completed' : 'pending';
+        mutation.mutate({ id, status: newStatus });
+    }
+
+    if (isLoading) return <div className="text-center mt-12"><CircularProgress /> Loading appointments...</div>;
+    if (error) return <div className="text-center mt-12 text-red-500">Error fetching appointments</div>;
 
     return (
-        <Container>
-            <Typography variant="h4" gutterBottom>My Appointments</Typography>
-            <List>
+        <Container className="mt-12">
+            <Typography variant="h4" className="text-center text-red-500 mb-6">
+                My Appointments
+            </Typography>
+            <List className="space-y-4">
                 {appointments.map(app => (
-                    <ListItem key={app._id}>
+                    <ListItem key={app._id} className="bg-white p-4 rounded-lg shadow-md">
                         <ListItemText
-                            primary={`${app.service} with ${app.user.name}`}
-                            secondary={`Date: ${new Date(app.date).toLocaleString()} - Status: ${app.status}`}
+                            primary={`Services: ${app.services.join(', ')} | Total: $${app.totalPrice}`}
+                            secondary={`Client: ${app.user.name} | Date: ${new Date(app.date).toLocaleString()} | Status: ${app.status}`}
+                            className="text-gray-800"
                         />
+                        {app.status === 'pending' ?
+                            <Button
+                                variant="contained"
+                                color="success"
+                                onClick={() => handleChangeStatus(app._id, app.status)}
+                            >
+                                Mark as Completed
+                            </Button>
+                            :
+                            <></>
+                        }
+
                     </ListItem>
                 ))}
             </List>
